@@ -19,9 +19,9 @@
 >### This program counts with a rate limiting functionality that will increase the waiting time every time a wrong private key is provided. The rate limit resets to default every time the program is launched.
 
 ```diff
-- <h1>IMPORTANT:</h1>
+- IMPORTANT:
+- The program won't run without a properly set .env file. Check footnotes
 ```
-> # The program won't run without a properly set
 
 [^1]: This is where the private and public keys are stored. PUBLIC_KEY can be any string, but PRIVATE_KEY must be a Fernet token hashed with blake2b with 64 digest size. Program won't run without these vars.
 [^2]: This is where the encrypted passwords get stored. You shouldn't write anything to this file, as the program handles it itself.
