@@ -1,4 +1,5 @@
 import os
+from time import sleep
 
 import strings as s
 
@@ -130,6 +131,12 @@ class Manager:
 
 class Menu:
     def __init__(self) -> None:
+        self.rate_limit: float = 2.5
+        # seconds to wait before retrying private key
+
+        self.rate_limit_factor: float = 1.5
+        #factor to increase retry time by
+
         self.user_input: str = ' '
         #initialize the user input as a space since blank space is the exit command in this class
 
@@ -150,8 +157,20 @@ class Menu:
                 self.mainloop()
                 #if new hash matches stored hash, grant access (doesn't decrypt passwords)
 
+            if self.user_input == '':
+                break
+                #break before waiting if input is blank space, blank is exit
+
             print(s.External.Menu.wrong_pass)
             #else inform the user that the private key is wrong
+
+            self.rate_limit *= self.rate_limit_factor
+            #increase wait time by 50%
+
+            sleep(self.rate_limit)
+            #limit rate to avoid brute force attacks.
+            #brute force is unlikely to work with hashes, but I will still take this precaution
+        exit()
 
     def mainloop(self) -> None:
         self.pass_handler.log_biology(self.user_input)
@@ -190,7 +209,7 @@ class Menu:
                 except KeyError: #if the command doesn't exist
                     print(s.External.Menu.not_found)
                     #inform the user that the command doesn't exist
-
+        exit()
 
 
 def main() -> None:
