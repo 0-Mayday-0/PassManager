@@ -6,7 +6,7 @@
 >- A folder called *crypto* in the same dir **manage.py** is.
 ---
 ### Once the crypto folder is created, the following files should be created inside it:
->- [X] .env [^1]
+>- [X] .env [^1] (Check footnotes)
 >- [X] stash.json [^2]
 ---
 ### If everything is set up correctly, the program will look like this:
