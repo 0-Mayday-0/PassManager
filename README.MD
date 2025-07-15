@@ -23,5 +23,12 @@
 - The program won't run without a properly set .env file. Check footnotes
 ```
 
+---
+
+# PassDB 1.0 merge!:
+> ### Replaced the self dict for a database (TinyDB lib), should be faster to run with Query objects instead of loading the entire file onto memory.
+
+---
+
 [^1]: This is where the private and public keys are stored. PUBLIC_KEY can be any string, but PRIVATE_KEY must be a Fernet token hashed with blake2b with 64 digest size. Program won't run without these vars.
 [^2]: This is where the encrypted passwords get stored. You shouldn't write anything to this file, as the program handles it itself.
