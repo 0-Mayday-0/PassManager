@@ -9,12 +9,18 @@ from hashlib import blake2b
 from cryptography.fernet import Fernet
 
 import json
+from tinydb import TinyDB, Query
+from tinydb.table import Table
 
 
 class Manager:
     def __init__(self, crypto_path: str, env_name: str) -> None:
         load_dotenv(f'{crypto_path}\\{env_name}')
         #loads .env file with env vars
+
+        # noinspection PyPep8Naming
+        self.Service: Query = Query()
+        # query object to operate in db
 
         self.max_length: int = 22
         #deprecated
@@ -34,6 +40,9 @@ class Manager:
         self.stash_path = f'.\\{self.crypto_path}\\{s.Internal.passwords_file_name}'
         #path to encrypted passwords
 
+        self.pass_db: TinyDB = TinyDB(f"{self.crypto_path}\\{s.Internal.passwords_database}")
+        #database object where the encrypted passwords are
+
         self.encrypted_bio: str = os.getenv(s.Internal.encoded_key_name)
         #hashed private key (B2b)
 
@@ -46,9 +55,10 @@ class Manager:
         self.encrypter: Fernet = ""
         #initialize encrypter object as str because can't initialize empty Fernet object
 
-        with open(self.stash_path, 'r') as stash_handle:
-            self.encrypted_passwords: dict[str, str] = json.load(stash_handle)
-            #load encrypted passwords json file and save it as a dict in self
+
+        self.services: Table = self.pass_db.table(s.Internal.table_name)
+        self.default_table: Table = self.pass_db.table(s.Internal.default_table_name)
+        #load list of services
 
     #removed __str__ attribute due to security concerns
 
@@ -71,32 +81,33 @@ class Manager:
         password: bytes = input(f'{s.External.Manager.prompt_password}').encode(s.Internal.encoding)
         #prompt the user for the password
 
-        self.encrypted_passwords[service] = self.encrypter.encrypt(password).decode(s.Internal.encoding)
-        #encrypts the password given and appends it to the self dict as string (decoding utf-8)
+        self.default_table.insert({s.Internal.service_key: service, s.Internal.password_key: self.encrypter.encrypt(password).decode(s.Internal.encoding)})
+        # insert service:pass pair into db
 
-        json_handler: json = json.dumps(self.encrypted_passwords, indent=self.indent)
-        #serialize the self dict
+        self.services.insert({s.Internal.service_key: service})
 
-        with open(f'.\\{self.crypto_path}\\{s.Internal.passwords_file_name}', 'w') as handle:
-            handle.write(json_handler)
-            #rewrite the json file with the new password
+
 
     def remove_password(self) -> None: #remove service and password pair from the self dict and rewrite the json file
         service: str = input(f'\n{s.External.Manager.prompt_service}')
         #prompt the user for the name of the service to remove
 
-        self.encrypted_passwords.pop(service)
-        #remove service from the self dict
+        # noinspection PyTypeChecker
+        if not self.services.contains(self.Service.service == service):
+            print(s.External.Manager.no_such_service.format(serv=service))
 
-        json_handler: json = json.dumps(self.encrypted_passwords, indent=self.indent)
-        #serialize self dict
+        else:
+            # noinspection PyTypeChecker
+            self.default_table.remove(self.Service.service == service)
+            #remove service + pass from db
 
-        with open(self.stash_path, 'w') as handle:
-            handle.write(json_handler)
-            #rewrite json file without the removed password
+            # noinspection PyTypeChecker
+            self.services.remove(self.Service.service == service)
+            #remove service from service list
 
             print(s.External.Manager.removed_password.format(serv=service))
-            #print confirmation to the user that the service/password was removed
+            # print confirmation to the user that the service/password was removed
+
 
     def edit_password(self) -> None: #edit a password (won't affect the service)
         service: str = input(f'\n{s.External.Manager.prompt_service}')
@@ -105,16 +116,18 @@ class Manager:
         password: bytes = input(f'\n{s.External.Manager.prompt_new_password}').encode(s.Internal.encoding)
         #prompt the user for a new password to be replaced in the dict
 
-        self.encrypted_passwords[service] = self.encrypter.encrypt(password).decode(s.Internal.encoding)
+        #self.encrypted_passwords[service] = self.encrypter.encrypt(password).decode(s.Internal.encoding)
         #emplace the new password to the existing service in the self dict
 
-        json_handler: json = json.dumps(self.encrypted_passwords, indent=self.indent)
-        #serialize self dict
-
-        with open(f'.\\{self.crypto_path}\\{s.Internal.passwords_file_name}', 'w') as handle:
-            handle.write(json_handler)
-            #rewrite the json file with the edited password
-
+        # noinspection PyTypeChecker
+        if not self.services.contains(self.Service.service == service): #if service isn't in db
+            print(s.External.Manager.no_such_service.format(serv=service))
+            #let the user know no such service exists
+        else:
+            self.default_table.update({s.Internal.service_key: service,
+                                            s.Internal.password_key: self.encrypter.encrypt(password).decode(s.Internal.encoding)},
+                                             self.Service.service == service)
+            #update the service:password pair in db
             print(s.External.Manager.edit_success)
             #confirm that the editing succeeded to the user
 
@@ -133,6 +146,9 @@ class Menu:
     def __init__(self) -> None:
         self.rate_limit: float = 2.5
         # seconds to wait before retrying private key
+
+        self.Service: Query = Query()
+        #Query item to handle db
 
         self.rate_limit_factor: float = 1.5
         #factor to increase retry time by
@@ -181,8 +197,8 @@ class Menu:
             print(f'\n{s.External.Menu.available}\n')
             #prints the header that shows available passwords
 
-            for index, service in enumerate(self.pass_handler.encrypted_passwords.keys()):
-                print(service, end=' - ')
+            for index, service in enumerate(self.pass_handler.services.all()):
+                print(service[s.Internal.service_key], end=' - ')
 
                 if (index+1) % 11 == 10:
                     print()
@@ -195,10 +211,13 @@ class Menu:
             #prompt the user for a service or one of the available commands and log it
 
             try:
-                encrypted_pass = self.pass_handler.encrypted_passwords[self.user_input]
+                encrypted_pass = self.pass_handler.default_table.get(self.Service.service == self.user_input)
                 #try to fetch an existing service with the input provided
 
-                print(self.pass_handler.encrypter.decrypt(encrypted_pass).decode(s.Internal.encoding), end='\n\n')
+                if encrypted_pass is None:
+                    raise KeyError(s.External.Manager.no_such_service.format(serv=self.user_input))
+
+                print(self.pass_handler.encrypter.decrypt(encrypted_pass[s.Internal.password_key]).decode(s.Internal.encoding), end='\n\n')
                 #decrypt in the print statement directly so the decrypted pass doesn't stay in memory
 
             except KeyError: #if the service doesn't exist
