@@ -7,9 +7,14 @@ class Internal:
     crypto_folder: str = "crypto"
     env_name: str = '.env'
     passwords_file_name: str = "stash.json"
+    passwords_database: str = "passdb.json"
     hash_file: str = "hash.pkl"
     filler_character: str = '$'
     encoding: str = 'utf-8'
+    service_key: str = "service"
+    password_key: str = "password"
+    table_name: str = "services"
+    default_table_name: str = "_default"
 
 @dataclass(frozen=True)
 class External:
@@ -28,3 +33,4 @@ class External:
         prompt_new_password: str = "Enter the new password to be replaced: "
         edit_success: str = "Password has been updated successfully."
         removed_password: str = "Removed {serv}'s password from file."
+        no_such_service: str = "No such service: {serv}"
